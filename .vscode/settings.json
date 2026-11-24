@@ -12,7 +12,9 @@
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"
   ],
-  "idf.portWin": "COM3",
-  "idf.monitorPort": "COM4",
+  "cmake.environment": {
+    "IDF_PATH": "C:/esp/v6.1/esp-idf/" // replace with wherever your esp-idf directory is
+                                       // not necessary to build but i wanted cmake to shut up
+  },
   "idf.flashType": "JTAG"
 }
