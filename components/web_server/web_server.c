@@ -20,6 +20,7 @@
 #include "esp_netif.h"
 #include "esp_event.h"
 #include "nvs_flash.h"
+#include "esp_mac.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -70,8 +71,9 @@ static uint8_t mac[MAC_ADDR_SIZE];
 
 
 // ----------- Misc functions -----------
+// Load the factory MAC address burnt into the chip 
 static esp_err_t load_mac_address(void) {
-    esp_err_t ret = esp_wifi_get_mac(WIFI_IF_AP, mac);
+    esp_err_t ret = esp_read_mac(mac, ESP_MAC_EFUSE_FACTORY);
     ESP_LOGI("MAC address", "MAC address: %02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     return ret;
 }

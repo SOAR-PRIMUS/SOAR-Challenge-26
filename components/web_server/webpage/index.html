@@ -14,8 +14,12 @@
         }
         .topbar {
             position: absolute; top: 0; left: 0; right: 0;
-            display: flex; flex-direction: column; align-items: center;
-            padding: 10px 0; gap: 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px 0;
+            gap: 4px;
+            z-index: 10;
         }
         h1 { margin: 4px 0; font-size: 26px; color: #999; letter-spacing: 2px; }
         .status { font-size: 13px; color: #888; }
@@ -25,6 +29,112 @@
         }
         #modeBtn.driver { background: #2ea043; color: white; }
         #modeBtn.auton  { background: #d29922; color: black; }
+
+        .polarity-panel {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 14px;
+            display: flex;
+            justify-content: center;
+            gap: 22px;
+            padding: 0 14px;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #c4d0d0;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 12px;
+            padding: 12px 14px;
+            min-width: 170px;
+            justify-content: space-between;
+            pointer-events: auto;
+        }
+        .toggle input {
+            position: absolute;
+            opacity: 0;
+            width: 1px;
+            height: 1px;
+            pointer-events: none;
+        }
+        .toggle-slider {
+            position: relative;
+            width: 56px;
+            height: 32px;
+            border-radius: 16px;
+            background: #56606a;
+            flex: 0 0 auto;
+            transition: background 0.2s ease;
+        }
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            left: 4px;
+            top: 4px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #e7ecef;
+            transition: transform 0.2s ease;
+        }
+        .toggle input:checked + .toggle-slider {
+            background: #2ea043;
+        }
+        .toggle input:checked + .toggle-slider::before {
+            transform: translateX(24px);
+        }
+
+        @media (max-width: 640px) {
+            h1 { font-size: 21px; }
+            .polarity-panel {
+                gap: 12px;
+                bottom: 12px;
+                padding: 0 8px;
+            }
+            .toggle {
+                min-width: 132px;
+                font-size: 13px;
+                padding: 10px 10px;
+            }
+            .toggle-slider {
+                width: 56px;
+                height: 32px;
+                border-radius: 16px;
+            }
+            .toggle-slider::before {
+                width: 24px;
+                height: 24px;
+            }
+            .toggle input:checked + .toggle-slider::before {
+                transform: translateX(24px);
+            }
+        }
+
+        @media (orientation: landscape) and (max-height: 520px) {
+            h1 { font-size: 20px; margin: 2px 0; }
+            .status { font-size: 12px; }
+            #modeBtn {
+                font-size: 14px;
+                padding: 8px 18px;
+                margin-top: 4px;
+            }
+            .polarity-panel {
+                bottom: 8px;
+                gap: 10px;
+            }
+            .toggle {
+                min-width: 144px;
+                font-size: 12px;
+                padding: 8px 10px;
+            }
+        }
 
         .zone {
             position: absolute; top: 0; bottom: 0; width: 50%;
@@ -54,7 +164,7 @@
 </head>
 <body oncontextmenu="return false">
     <div class="topbar">
-        <h1>Demo Robot Controller</h1>
+        <h1>SOAR Challenge '26 Controller</h1>
         <div class="status" id="status">connecting...</div>
         <div class="status" id="readout">steer: 0.00, 0.00 &nbsp; throttle: 0.00, 0.00</div>
         <button id="modeBtn" class="driver">DRIVER CONTROL</button>
@@ -67,6 +177,19 @@
     <div class="zone right">
         <div class="zone-label">THROTTLE</div>
         <div class="base" id="baseThrottle"><div class="knob" id="knobThrottle"></div></div>
+    </div>
+
+    <div class="polarity-panel">
+        <label class="toggle">
+            <span>Left reversed</span>
+            <input type="checkbox" id="leftPolarityToggle">
+            <span class="toggle-slider" aria-hidden="true"></span>
+        </label>
+        <label class="toggle">
+            <span>Right reversed</span>
+            <input type="checkbox" id="rightPolarityToggle" checked>
+            <span class="toggle-slider" aria-hidden="true"></span>
+        </label>
     </div>
 
 <script>
@@ -126,6 +249,8 @@ let isAuton = false;
 const modeBtn = document.getElementById('modeBtn');
 const baseSteerEl = document.getElementById('baseSteer');
 const baseThrottleEl = document.getElementById('baseThrottle');
+const leftPolarityToggleEl = document.getElementById('leftPolarityToggle');
+const rightPolarityToggleEl = document.getElementById('rightPolarityToggle');
 
 modeBtn.addEventListener('click', function () {
     isAuton = !isAuton;
@@ -180,8 +305,8 @@ try {
 // holding a stick steady never looks "stale" to the ESP32's watchdog. While
 // Autonomous is selected, all four axes are forced to -1.00 and the
 // joysticks are disabled above -- this keeps the wire format identical in
-// both modes, which is what lets the C side reuse the same arcade-drive
-// mixing for opcontrol() and auton() (see main/l298n_robot_main.c).
+// both modes. Left/right polarity are also sent on every packet so wheel
+// inversion can be changed live while driving.
 setInterval(function () {
     if (!connection || connection.readyState !== WebSocket.OPEN) return;
 
@@ -195,13 +320,18 @@ setInterval(function () {
         ty = throttleStick.y;
     }
 
+    var leftPolarity = leftPolarityToggleEl.checked ? -1 : 1;
+    var rightPolarity = rightPolarityToggleEl.checked ? -1 : 1;
+
     document.getElementById('readout').innerText =
         'steer: ' + sx.toFixed(2) + ', ' + sy.toFixed(2) +
-        '   throttle: ' + tx.toFixed(2) + ', ' + ty.toFixed(2);
+        '   throttle: ' + tx.toFixed(2) + ', ' + ty.toFixed(2) +
+        '   polarity L/R: ' + leftPolarity + '/' + rightPolarity;
 
     var msg = sx.toFixed(2) + ',' + sy.toFixed(2) + ',' +
               tx.toFixed(2) + ',' + ty.toFixed(2) + ',' +
-              (isAuton ? '1' : '0');
+              (isAuton ? '1' : '0') + ',' +
+              leftPolarity + ',' + rightPolarity;
     connection.send(msg);
 }, 60);
 </script>
