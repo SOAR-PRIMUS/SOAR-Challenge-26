@@ -1,4 +1,4 @@
-# SOAR-Challenge-26
+# SOAR Challenge 2026 Template
 hihi, here's a cool code template for SOAR Challenge '26 I think
 
 **Note**: the instructions for development via CLI are included for reference only. They should be accurate, but we cannot help you troubleshoot during the software workshop; be prepared to debug on your own. Use Visual Studio Code + the ESP-IDF extension if you want support.
